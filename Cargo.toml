@@ -1,10 +1,3 @@
-[package]
-name = "puzzles"
-version = "0.1.0"
-edition = "2021"
-
-[[bin]]
-name = "countess"
-path = "src/bin/countess.rs"
-
-[dependencies]
+[workspace]
+members = ["countess", "letter-boxed",]
+resolver = "2"
