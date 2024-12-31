@@ -1,9 +1,38 @@
+use std::{iter::Peekable, str::Lines};
+
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use layout::Flex;
 use ratatui::{prelude::*, widgets::Block};
 
 const CORPUS: &'static str = include_str!("../data/words_alpha.txt");
 const CORPUS_LEN: usize = CORPUS.len();
+
+struct Trie {
+    contains: bool,
+    children: [Option<Box<Trie>>; 26],
+}
+
+fn ord(c: char) -> usize {
+    c.to_ascii_uppercase() as usize - 'A' as usize
+}
+
+impl Trie {
+    fn construct_from(prefix: &str, lines: &mut Peekable<Lines>) -> Option<Box<Self>> {}
+
+    /// assumes corpus is sorted alphabetically
+    fn construct() -> Self {
+        let mut children = [None; 26];
+        let mut lines = CORPUS.lines().peekable();
+        for i in 'A'..='Z' {
+            let prefix = i.to_string();
+            children[ord(i)] = Self::construct_from(&prefix, &mut lines);
+        }
+        Self {
+            contains: false,
+            children,
+        }
+    }
+}
 
 #[derive(Default)]
 struct Puzzle {
