@@ -1,8 +1,12 @@
-use std::{iter::Peekable, str::Lines};
+use std::{fmt::Display, iter::Peekable, str::Lines};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use layout::Flex;
-use ratatui::{prelude::*, widgets::Block};
+use ratatui::{
+    prelude::*,
+    widgets::{Block, List},
+    DefaultTerminal,
+};
 
 const CORPUS: &'static str = include_str!("../data/words_alpha.txt");
 const CORPUS_LEN: usize = CORPUS.len();
@@ -12,25 +16,63 @@ struct Trie {
     children: [Option<Box<Trie>>; 26],
 }
 
-fn ord(c: char) -> usize {
-    c.to_ascii_uppercase() as usize - 'A' as usize
-}
-
 impl Trie {
-    fn construct_from(prefix: &str, lines: &mut Peekable<Lines>) -> Option<Box<Self>> {}
+    fn construct_from(prefix: &str, lines: &mut Peekable<Lines>) -> Self {
+        let contains = lines.next_if_eq(&prefix).is_some();
+        let mut children = [const { None }; 26];
+        while lines.peek().is_some_and(|&word| word.starts_with(prefix)) {
+            let next_prefix = &lines.peek().unwrap()[..=prefix.len()];
+            let position = next_prefix.as_bytes()[prefix.len()] % 32 - 1;
+            children[position as usize] = Some(Box::new(Self::construct_from(next_prefix, lines)));
+        }
+        Self { contains, children }
+    }
 
-    /// assumes corpus is sorted alphabetically
+    /// assumes corpus is sorted alphabetically and contains no duplicates
     fn construct() -> Self {
-        let mut children = [None; 26];
         let mut lines = CORPUS.lines().peekable();
-        for i in 'A'..='Z' {
-            let prefix = i.to_string();
-            children[ord(i)] = Self::construct_from(&prefix, &mut lines);
+        Self::construct_from("", &mut lines)
+    }
+
+    fn take(&self, prefix: &str, mut n: usize) -> Vec<String> {
+        let mut results = Vec::with_capacity(n);
+        if self.contains {
+            results.push(prefix.to_owned());
+            n -= 1;
         }
-        Self {
-            contains: false,
-            children,
+        for (i, child) in self
+            .children
+            .iter()
+            .enumerate()
+            .filter_map(|(i, child)| child.as_ref().map(|c| (i, c)))
+        {
+            if n == 0 {
+                break;
+            }
+            let c = (i as u8 + 'A' as u8) as char;
+            let next_prefix = format!("{prefix}{c}");
+            let next_results = child.take(&next_prefix, n);
+            n -= next_results.len();
+            results.extend(next_results);
         }
+        results
+    }
+
+    fn filter(&self, prefix: &str) -> Option<&Self> {
+        if prefix.is_empty() {
+            Some(self)
+        } else {
+            let position = prefix.as_bytes()[0] % 32 - 1;
+            let next = self.children[position as usize].as_ref()?;
+            next.filter(&prefix[1..])
+        }
+    }
+
+    fn filter_and_take(&self, prefix: &str, n: usize) -> Vec<String> {
+        let Some(suffix) = self.filter(prefix) else {
+            return vec![];
+        };
+        suffix.take(prefix, n)
     }
 }
 
@@ -42,6 +84,7 @@ struct Puzzle {
 
 impl Puzzle {
     const WIDTH: u16 = 15;
+    const HEIGHT: u16 = 9;
 
     fn insert(&mut self, c: char) {
         match self.letters[self.cursor].replace(c.to_ascii_uppercase()) {
@@ -81,6 +124,14 @@ impl Puzzle {
     fn move_cursor_backward(&mut self) {
         self.cursor = self.previous_cursor_position();
     }
+
+    fn is_filled(&self) -> Option<[char; 12]> {
+        if self.letters.iter().all(|l| l.is_some()) {
+            Some(self.letters.map(|l| l.unwrap()))
+        } else {
+            None
+        }
+    }
 }
 
 impl Widget for &Puzzle {
@@ -117,69 +168,116 @@ impl Widget for &Puzzle {
     }
 }
 
+struct Input {
+    trie: Trie,
+    input: String,
+}
+
+impl Input {
+    fn new() -> Self {
+        Self {
+            trie: Trie::construct(),
+            input: String::new(),
+        }
+    }
+
+    fn insert(&mut self, c: char) {
+        self.input.push(c.to_ascii_uppercase());
+    }
+
+    fn delete(&mut self) {
+        self.input.pop();
+    }
+}
+
+impl Widget for &Input {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+        let [search_area, results_area] =
+            Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
+                .spacing(1)
+                .areas(area);
+        Line::from_iter([Span::raw(&self.input), Span::raw(" ").underlined()])
+            .render(search_area, buf);
+        let n_results = results_area.height;
+        let results = self.trie.filter_and_take(&self.input, n_results as usize);
+        Widget::render(List::new(results), results_area, buf);
+    }
+}
+
 // trie to deal with adjacencies
 // then process into map from first to last letter with bitvector of letters used
 // progress steps: processing corpus, checking for one word solutions, two word solutions, etc.
 
-fn main() -> Result<(), std::io::Error> {
+fn layout(area: Rect) -> [Rect; 2] {
+    let [puzzle_area, solving_area] =
+        Layout::vertical([Constraint::Length(Puzzle::HEIGHT), Constraint::Fill(1)])
+            .margin(2)
+            .spacing(2)
+            .areas(area);
+    let [puzzle_area] = Layout::horizontal([Puzzle::WIDTH])
+        .flex(Flex::Center)
+        .areas(puzzle_area);
+    [puzzle_area, solving_area]
+}
+
+fn read_key() -> std::io::Result<KeyCode> {
+    match event::read()? {
+        Event::Key(KeyEvent {
+            code,
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: _,
+        }) => Ok(code),
+        _ => read_key(),
+    }
+}
+
+fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
+    run(&mut terminal)?;
+    ratatui::restore();
+    Ok(())
+}
+
+fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
     let mut puzzle = Puzzle::default();
-    loop {
+    let letters = loop {
         terminal.draw(|f| {
-            let [area] = Layout::horizontal([Puzzle::WIDTH])
-                .flex(Flex::Center)
-                .vertical_margin(2)
-                .areas(f.area());
-            f.render_widget(&puzzle, area)
+            let [puzzle_area, solving_area] = layout(f.area());
+            f.render_widget(&puzzle, puzzle_area);
+            if puzzle.is_filled().is_some() {
+                f.render_widget(Span::raw("Press enter to start solving"), solving_area)
+            }
         })?;
-        match event::read()? {
-            Event::Key(KeyEvent {
-                code: KeyCode::Char(c),
-                modifiers: KeyModifiers::NONE,
-                kind: KeyEventKind::Press,
-                state: _,
-            }) => {
-                puzzle.insert(c);
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Backspace,
-                modifiers: KeyModifiers::NONE,
-                kind: KeyEventKind::Press,
-                state: _,
-            }) => puzzle.delete(),
-            Event::Key(KeyEvent {
-                code: KeyCode::Right,
-                modifiers: KeyModifiers::NONE,
-                kind: KeyEventKind::Press,
-                state: _,
-            }) => {
-                puzzle.move_cursor_forward();
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Left,
-                modifiers: KeyModifiers::NONE,
-                kind: KeyEventKind::Press,
-                state: _,
-            }) => {
-                puzzle.move_cursor_backward();
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Esc,
-                modifiers: KeyModifiers::NONE,
-                kind: KeyEventKind::Press,
-                state: _,
-            }) => break,
-            Event::Key(KeyEvent {
-                code: KeyCode::Enter,
-                modifiers: KeyModifiers::NONE,
-                kind: KeyEventKind::Press,
-                state: _,
-            }) => {
-                todo!();
+        match read_key()? {
+            KeyCode::Char(c) => puzzle.insert(c),
+            KeyCode::Backspace => puzzle.delete(),
+            KeyCode::Right => puzzle.move_cursor_forward(),
+            KeyCode::Left => puzzle.move_cursor_backward(),
+            KeyCode::Esc => return Ok(()),
+            KeyCode::Enter => {
+                if let Some(letters) = puzzle.is_filled() {
+                    break letters;
+                }
             }
             _ => {}
         }
+    };
+    let mut input = Input::new();
+    loop {
+        terminal.draw(|f| {
+            let [puzzle_area, solving_area] = layout(f.area());
+            f.render_widget(&puzzle, puzzle_area);
+            f.render_widget(&input, solving_area);
+        })?;
+        match read_key()? {
+            KeyCode::Char(c) => input.insert(c),
+            KeyCode::Backspace => input.delete(),
+            KeyCode::Esc => return Ok(()),
+            _ => {}
+        }
     }
-    ratatui::restore();
-    Ok(())
 }
