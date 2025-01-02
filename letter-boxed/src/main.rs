@@ -65,15 +65,23 @@ fn run(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
             _ => {}
         }
     };
+    terminal.draw(|f| {
+        let [puzzle_area, solving_area] = layout(f.area());
+        f.render_widget(&puzzle, puzzle_area);
+        f.render_widget(Span::raw("Solving..."), solving_area);
+    })?;
     let solver = Solver::new(letters);
+    let mut result = solver.solve();
     loop {
         terminal.draw(|f| {
             let [puzzle_area, solving_area] = layout(f.area());
             f.render_widget(&puzzle, puzzle_area);
-            f.render_widget(&solver, solving_area);
+            f.render_widget(&result, solving_area);
         })?;
         match read_key()? {
             KeyCode::Esc => return Ok(()),
+            KeyCode::Down => result.scroll_down(),
+            KeyCode::Up => result.scroll_up(),
             _ => {}
         }
     }

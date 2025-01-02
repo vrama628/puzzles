@@ -59,6 +59,7 @@ impl Trie {
         }
     }
 
+    #[allow(dead_code)]
     pub fn filter_and_take(&self, prefix: &str, n: usize) -> Vec<String> {
         let Some(suffix) = self.filter(prefix) else {
             return vec![];
