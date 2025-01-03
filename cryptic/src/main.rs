@@ -1,8 +1,19 @@
-use std::collections::BTreeMap;
-
 use clap::Parser;
+use indexmap::IndexMap;
 
+const CORPUS: &str = include_str!("../data/unigram_freq.csv");
+
+fn corpus() -> impl Iterator<Item = &'static str> {
+    CORPUS.lines().map(|line| line.split_once(',').unwrap().0)
+}
+
+/*
 const CORPUS: &str = include_str!("../data/words_alpha.txt");
+
+fn corpus() -> impl Iterator<Item = &'static str> {
+    CORPUS.lines()
+}
+*/
 
 fn set(word: &str) -> u128 {
     let mut res = 0;
@@ -27,10 +38,10 @@ impl Args {
     }
 
     fn case(start: char, end: char) {
-        let mut interiors_of_matches: BTreeMap<u128, Vec<String>> = BTreeMap::new();
-        let mut anagrams: BTreeMap<u128, Vec<String>> = BTreeMap::new();
+        let mut interiors_of_matches: IndexMap<u128, Vec<String>> = IndexMap::new();
+        let mut anagrams: IndexMap<u128, Vec<String>> = IndexMap::new();
 
-        for line in CORPUS.lines() {
+        for line in corpus() {
             if let Some(interior) = line
                 .strip_prefix(start)
                 .and_then(|line| line.strip_suffix(end))
@@ -54,7 +65,7 @@ impl Args {
 
     fn core(core: String) {
         let core_set = set(&core);
-        for line in CORPUS.lines() {
+        for line in corpus() {
             if line.len() > 1 && core_set == set(&line[1..line.len() - 1]) {
                 println!("{}", line);
             }
