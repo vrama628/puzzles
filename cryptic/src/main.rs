@@ -26,7 +26,7 @@ fn set(word: &str) -> u128 {
 
 #[derive(Parser)]
 enum Args {
-    Case { start: char, end: char },
+    Case { start: String, end: String },
     Core { core: String },
     Knit,
 }
@@ -40,14 +40,14 @@ impl Args {
         }
     }
 
-    fn case(start: char, end: char) {
+    fn case(start: String, end: String) {
         let mut interiors_of_matches: IndexMap<u128, Vec<String>> = IndexMap::new();
         let mut anagrams: IndexMap<u128, Vec<String>> = IndexMap::new();
 
         for line in corpus() {
             if let Some(interior) = line
-                .strip_prefix(start)
-                .and_then(|line| line.strip_suffix(end))
+                .strip_prefix(&start)
+                .and_then(|line| line.strip_suffix(&end))
             {
                 let interior_set = set(interior);
                 interiors_of_matches
