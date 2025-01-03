@@ -1,5 +1,6 @@
 use clap::Parser;
 use indexmap::IndexMap;
+use letter_boxed::trie::Trie;
 
 const CORPUS: &str = include_str!("../data/unigram_freq.csv");
 
@@ -27,6 +28,7 @@ fn set(word: &str) -> u128 {
 enum Args {
     Case { start: char, end: char },
     Core { core: String },
+    Knit,
 }
 
 impl Args {
@@ -34,6 +36,7 @@ impl Args {
         match self {
             Self::Case { start, end } => Self::case(start, end),
             Self::Core { core } => Self::core(core),
+            Self::Knit => Self::knit(),
         }
     }
 
@@ -70,6 +73,45 @@ impl Args {
                 println!("{}", line);
             }
         }
+    }
+
+    fn knit() {
+        let trie = Trie::construct();
+        knit_knot(&Knit::knew(&trie), &Knit::knew(&trie), &Knit::knew(&trie));
+    }
+}
+
+fn knit_knot(left: &Knit, right: &Knit, both: &Knit) {
+    if left.trie.contains && right.trie.contains && both.trie.contains {
+        println!("{} + {} = {}", left.prefix, right.prefix, both.prefix);
+    }
+    for c in 'A'..='Z' {
+        if let Some((left, both)) = left.push(c).zip(both.push(c)) {
+            knit_knot(right, &left, &both)
+        }
+    }
+}
+
+struct Knit<'a> {
+    trie: &'a Trie,
+    prefix: String,
+}
+
+impl<'a> Knit<'a> {
+    fn knew(trie: &'a Trie) -> Self {
+        Self {
+            trie,
+            prefix: String::new(),
+        }
+    }
+
+    fn push(&self, c: char) -> Option<Self> {
+        self.trie.children[c as usize % 32 - 1]
+            .as_ref()
+            .map(|trie| {
+                let prefix = format!("{}{c}", self.prefix);
+                Self { trie, prefix }
+            })
     }
 }
 
