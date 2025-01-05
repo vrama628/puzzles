@@ -1,5 +1,11 @@
+use std::rc::Rc;
+
 use clap::Parser;
 use indexmap::IndexMap;
+
+mod knit;
+
+use knit::{knit_knot, Knit};
 use letter_boxed::trie::Trie;
 
 const CORPUS: &str = include_str!("../data/unigram_freq.csv");
@@ -29,6 +35,7 @@ enum Args {
     Case { start: String, end: String },
     Core { core: String },
     Knit,
+    Hide { n: usize },
 }
 
 impl Args {
@@ -37,6 +44,7 @@ impl Args {
             Self::Case { start, end } => Self::case(start, end),
             Self::Core { core } => Self::core(core),
             Self::Knit => Self::knit(),
+            Self::Hide { n } => Self::hide(n),
         }
     }
 
@@ -79,39 +87,61 @@ impl Args {
         let trie = Trie::construct();
         knit_knot(&Knit::knew(&trie), &Knit::knew(&trie), &Knit::knew(&trie));
     }
-}
 
-fn knit_knot(left: &Knit, right: &Knit, both: &Knit) {
-    if left.trie.contains && right.trie.contains && both.trie.contains {
-        println!("{} + {} = {}", left.prefix, right.prefix, both.prefix);
-    }
-    for c in 'A'..='Z' {
-        if let Some((left, both)) = left.push(c).zip(both.push(c)) {
-            knit_knot(right, &left, &both)
+    fn hide(n: usize) {
+        let trie = Trie::construct();
+        for hide in corpus().map(|word| Hide::word(&trie, word)) {
+            for word in corpus().take(10000) {
+                let (h, results) = hide.add(word);
+                for r in results {
+                    if r.len() >= n {
+                        println!("{:30}{}", h.words.join(" "), r);
+                    }
+                }
+            }
         }
     }
 }
 
-struct Knit<'a> {
-    trie: &'a Trie,
-    prefix: String,
+#[derive(Clone)]
+struct Hide<'a> {
+    tries: Vec<Knit<'a>>,
+    words: Vec<Rc<str>>,
 }
 
-impl<'a> Knit<'a> {
-    fn knew(trie: &'a Trie) -> Self {
+impl<'a> Hide<'a> {
+    fn word(trie: &'a Trie, word: &str) -> Self {
+        let mut tries = vec![];
+        for c in word.chars().skip(1) {
+            tries.push(Knit::knew(trie));
+            tries = tries.into_iter().filter_map(|t| t.push(c)).collect();
+        }
         Self {
-            trie,
-            prefix: String::new(),
+            tries,
+            words: vec![Rc::from(word)],
         }
     }
 
-    fn push(&self, c: char) -> Option<Self> {
-        self.trie.children[c as usize % 32 - 1]
-            .as_ref()
-            .map(|trie| {
-                let prefix = format!("{}{c}", self.prefix);
-                Self { trie, prefix }
-            })
+    fn add(&self, word: &str) -> (Self, Vec<String>) {
+        let mut results = vec![];
+        let Self {
+            mut tries,
+            mut words,
+        } = self.clone();
+        for c in word.chars().take(word.len() - 1) {
+            tries = tries
+                .into_iter()
+                .filter_map(|t| {
+                    t.push(c).inspect(|t| {
+                        if let Some(s) = t.try_get() {
+                            results.push(s.to_owned())
+                        }
+                    })
+                })
+                .collect();
+        }
+        words.push(Rc::from(word));
+        (Self { tries, words }, results)
     }
 }
 
