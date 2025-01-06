@@ -90,7 +90,7 @@ impl Args {
 
     fn hide(target: String) {
         let mut hide = Hide::new(target);
-        for word in corpus() {
+        for word in corpus().filter(|&w| w == "a" || w == "i" || w.len() > 1) {
             hide.add(word);
         }
     }
