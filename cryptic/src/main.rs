@@ -1,8 +1,8 @@
-use std::rc::Rc;
-
 use clap::Parser;
+use hide::Hide;
 use indexmap::IndexMap;
 
+mod hide;
 mod knit;
 
 use knit::{knit_knot, Knit};
@@ -35,7 +35,7 @@ enum Args {
     Case { start: String, end: String },
     Core { core: String },
     Knit,
-    Hide { n: usize },
+    Hide { target: String },
 }
 
 impl Args {
@@ -44,7 +44,7 @@ impl Args {
             Self::Case { start, end } => Self::case(start, end),
             Self::Core { core } => Self::core(core),
             Self::Knit => Self::knit(),
-            Self::Hide { n } => Self::hide(n),
+            Self::Hide { target } => Self::hide(target),
         }
     }
 
@@ -88,60 +88,11 @@ impl Args {
         knit_knot(&Knit::knew(&trie), &Knit::knew(&trie), &Knit::knew(&trie));
     }
 
-    fn hide(n: usize) {
-        let trie = Trie::construct();
-        for hide in corpus().map(|word| Hide::word(&trie, word)) {
-            for word in corpus().take(10000) {
-                let (h, results) = hide.add(word);
-                for r in results {
-                    if r.len() >= n {
-                        println!("{:30}{}", h.words.join(" "), r);
-                    }
-                }
-            }
+    fn hide(target: String) {
+        let mut hide = Hide::new(target);
+        for word in corpus() {
+            hide.add(word);
         }
-    }
-}
-
-#[derive(Clone)]
-struct Hide<'a> {
-    tries: Vec<Knit<'a>>,
-    words: Vec<Rc<str>>,
-}
-
-impl<'a> Hide<'a> {
-    fn word(trie: &'a Trie, word: &str) -> Self {
-        let mut tries = vec![];
-        for c in word.chars().skip(1) {
-            tries.push(Knit::knew(trie));
-            tries = tries.into_iter().filter_map(|t| t.push(c)).collect();
-        }
-        Self {
-            tries,
-            words: vec![Rc::from(word)],
-        }
-    }
-
-    fn add(&self, word: &str) -> (Self, Vec<String>) {
-        let mut results = vec![];
-        let Self {
-            mut tries,
-            mut words,
-        } = self.clone();
-        for c in word.chars().take(word.len() - 1) {
-            tries = tries
-                .into_iter()
-                .filter_map(|t| {
-                    t.push(c).inspect(|t| {
-                        if let Some(s) = t.try_get() {
-                            results.push(s.to_owned())
-                        }
-                    })
-                })
-                .collect();
-        }
-        words.push(Rc::from(word));
-        (Self { tries, words }, results)
     }
 }
 
