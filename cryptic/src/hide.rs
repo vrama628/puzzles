@@ -9,9 +9,9 @@ pub struct Hide {
 
 impl Hide {
     pub fn new(target: String) -> Self {
-        let starts = vec![vec![]; target.len()];
-        let middles = vec![vec![None; target.len()]; target.len()];
-        let ends = vec![vec![]; target.len()];
+        let starts = vec![vec![]; target.len() + 1];
+        let middles = vec![vec![None; target.len() + 1]; target.len() + 1];
+        let ends = vec![vec![]; target.len() + 1];
         Self {
             target,
             starts,
