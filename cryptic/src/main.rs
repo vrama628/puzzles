@@ -9,12 +9,16 @@ use knit::{knit_knot, Knit};
 use letter_boxed::trie::Trie;
 
 const FREQ_CORPUS: &str = include_str!("../data/unigram_freq.csv");
-const SCOWL_CORPUS: &str = include_str!("../data/scowl/final/english-words.35");
+const SCOWL_CORPUS_10: &str = include_str!("../data/scowl/final/english-words.10");
+const SCOWL_CORPUS_20: &str = include_str!("../data/scowl/final/english-words.20");
+const SCOWL_CORPUS_35: &str = include_str!("../data/scowl/final/english-words.35");
 const SIMPLE_CORPUS: &str = include_str!("../data/words_alpha.txt");
 
 fn scowl_corpus() -> impl Iterator<Item = &'static str> {
-    SCOWL_CORPUS
+    SCOWL_CORPUS_10
         .lines()
+        .chain(SCOWL_CORPUS_20.lines())
+        .chain(SCOWL_CORPUS_35.lines())
         .filter(|w| w.chars().all(|c| c.is_alphabetic()))
 }
 
@@ -42,6 +46,7 @@ enum Args {
     Core { core: String },
     Knit,
     Hide { target: String },
+    Ruin { target: Vec<String> },
 }
 
 impl Args {
@@ -51,6 +56,7 @@ impl Args {
             Self::Core { core } => Self::core(core),
             Self::Knit => Self::knit(),
             Self::Hide { target } => Self::hide(target),
+            Self::Ruin { target } => Self::ruin(target),
         }
     }
 
@@ -98,6 +104,39 @@ impl Args {
         let mut hide = Hide::new(target);
         for word in scowl_corpus() {
             hide.add(word);
+        }
+    }
+
+    fn ruin(target: Vec<String>) {
+        let mut target_set = 0;
+        for word in target {
+            target_set += set(&word);
+        }
+        let words: Vec<(&str, u128)> = scowl_corpus().map(|word| (word, set(word))).collect();
+        let mut candidates: Vec<(Vec<&str>, u128)> = vec![(vec![], 0)];
+        while !candidates.is_empty() {
+            candidates = candidates
+                .into_iter()
+                .flat_map(|(candidate_words, candidate_set)| {
+                    words.iter().filter_map(move |(word, word_set)| {
+                        let new_set = candidate_set + word_set;
+                        (candidate_words.last().is_none_or(|&last| last <= word)
+                            && (0..32).all(|i| {
+                                new_set & (0b1111 << 4 * i) <= target_set & (0b1111 << 4 * i)
+                            }))
+                        .then(|| {
+                            let mut words = candidate_words.clone();
+                            words.push(word);
+                            (words, new_set)
+                        })
+                    })
+                })
+                .inspect(|(words, set)| {
+                    if *set == target_set {
+                        println!("{}", words.join(" "))
+                    }
+                })
+                .collect();
         }
     }
 }
