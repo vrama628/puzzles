@@ -5,8 +5,6 @@ pub struct Hide {
     ends: Vec<Vec<String>>,
 }
 
-// TODO: interior words
-
 impl Hide {
     pub fn new(target: String) -> Self {
         let starts = vec![vec![]; target.len() + 1];

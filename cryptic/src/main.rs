@@ -8,19 +8,25 @@ mod knit;
 use knit::{knit_knot, Knit};
 use letter_boxed::trie::Trie;
 
-const CORPUS: &str = include_str!("../data/unigram_freq.csv");
+const FREQ_CORPUS: &str = include_str!("../data/unigram_freq.csv");
+const SCOWL_CORPUS: &str = include_str!("../data/scowl/final/english-words.35");
+const SIMPLE_CORPUS: &str = include_str!("../data/words_alpha.txt");
 
-fn corpus() -> impl Iterator<Item = &'static str> {
-    CORPUS.lines().map(|line| line.split_once(',').unwrap().0)
+fn scowl_corpus() -> impl Iterator<Item = &'static str> {
+    SCOWL_CORPUS
+        .lines()
+        .filter(|w| w.chars().all(|c| c.is_alphabetic()))
 }
 
-/*
-const CORPUS: &str = include_str!("../data/words_alpha.txt");
-
-fn corpus() -> impl Iterator<Item = &'static str> {
-    CORPUS.lines()
+fn freq_corpus() -> impl Iterator<Item = &'static str> {
+    FREQ_CORPUS
+        .lines()
+        .map(|line| line.split_once(',').unwrap().0)
 }
-*/
+
+fn simple_corpus() -> impl Iterator<Item = &'static str> {
+    SIMPLE_CORPUS.lines()
+}
 
 fn set(word: &str) -> u128 {
     let mut res = 0;
@@ -52,7 +58,7 @@ impl Args {
         let mut interiors_of_matches: IndexMap<u128, Vec<String>> = IndexMap::new();
         let mut anagrams: IndexMap<u128, Vec<String>> = IndexMap::new();
 
-        for line in corpus() {
+        for line in freq_corpus() {
             if let Some(interior) = line
                 .strip_prefix(&start)
                 .and_then(|line| line.strip_suffix(&end))
@@ -76,7 +82,7 @@ impl Args {
 
     fn core(core: String) {
         let core_set = set(&core);
-        for line in corpus() {
+        for line in freq_corpus() {
             if line.len() > 1 && core_set == set(&line[1..line.len() - 1]) {
                 println!("{}", line);
             }
@@ -90,7 +96,7 @@ impl Args {
 
     fn hide(target: String) {
         let mut hide = Hide::new(target);
-        for word in corpus() {
+        for word in scowl_corpus() {
             hide.add(word);
         }
     }
