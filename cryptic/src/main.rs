@@ -42,11 +42,22 @@ fn set(word: &str) -> u128 {
 
 #[derive(Parser)]
 enum Args {
-    Case { start: String, end: String },
-    Core { core: String },
+    Case {
+        start: String,
+        end: String,
+    },
+    Core {
+        core: String,
+    },
     Knit,
-    Hide { target: String },
-    Ruin { target: Vec<String> },
+    Hide {
+        #[arg(short, long)]
+        minimum_overlap: Option<usize>,
+        target: String,
+    },
+    Ruin {
+        target: Vec<String>,
+    },
 }
 
 impl Args {
@@ -55,7 +66,10 @@ impl Args {
             Self::Case { start, end } => Self::case(start, end),
             Self::Core { core } => Self::core(core),
             Self::Knit => Self::knit(),
-            Self::Hide { target } => Self::hide(target),
+            Self::Hide {
+                target,
+                minimum_overlap,
+            } => Self::hide(target, minimum_overlap),
             Self::Ruin { target } => Self::ruin(target),
         }
     }
@@ -100,8 +114,8 @@ impl Args {
         knit_knot(&Knit::knew(&trie), &Knit::knew(&trie), &Knit::knew(&trie));
     }
 
-    fn hide(target: String) {
-        let mut hide = Hide::new(target);
+    fn hide(target: String, minimum_overlap: Option<usize>) {
+        let mut hide = Hide::new(target, minimum_overlap);
         for word in scowl_corpus() {
             hide.add(word);
         }

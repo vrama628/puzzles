@@ -1,17 +1,19 @@
 pub struct Hide {
     target: String,
+    minimum_overlap: usize,
     starts: Vec<Vec<String>>,
     middles: Vec<Vec<Option<String>>>,
     ends: Vec<Vec<String>>,
 }
 
 impl Hide {
-    pub fn new(target: String) -> Self {
+    pub fn new(target: String, minimum_overlap: Option<usize>) -> Self {
         let starts = vec![vec![]; target.len() + 1];
         let middles = vec![vec![None; target.len() + 1]; target.len() + 1];
         let ends = vec![vec![]; target.len() + 1];
         Self {
             target,
+            minimum_overlap: minimum_overlap.unwrap_or(1),
             starts,
             middles,
             ends,
@@ -65,7 +67,7 @@ impl Hide {
                 }
             }
         }
-        for i in 1..word.len() {
+        for i in self.minimum_overlap..=word.len().saturating_sub(self.minimum_overlap) {
             if self.target.starts_with(&word[i..]) {
                 self.starts[word.len() - i].push(word.to_owned());
                 for suffix in &self.suffixes(word.len() - i) {
