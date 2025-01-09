@@ -1,6 +1,8 @@
+use std::collections::HashSet;
+
 use clap::Parser;
 use hide::Hide;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 mod hide;
 mod knit;
@@ -58,6 +60,9 @@ enum Args {
     Ruin {
         target: Vec<String>,
     },
+    Tuck {
+        character: Option<char>,
+    },
 }
 
 impl Args {
@@ -71,6 +76,7 @@ impl Args {
                 minimum_overlap,
             } => Self::hide(target, minimum_overlap),
             Self::Ruin { target } => Self::ruin(target),
+            Self::Tuck { character } => Self::tuck(character),
         }
     }
 
@@ -151,6 +157,32 @@ impl Args {
                     }
                 })
                 .collect();
+        }
+    }
+
+    fn tuck(character: Option<char>) {
+        let mut one_removed: IndexMap<String, Vec<(&str, char)>> = IndexMap::new();
+        let mut words: HashSet<&str> = HashSet::new();
+        for word in scowl_corpus() {
+            words.insert(word);
+            for (i, c) in word
+                .char_indices()
+                .take(word.len() - 1)
+                .skip(1)
+                .filter(|&(_, c)| character.is_none_or(|ch| c == ch))
+            {
+                let removed = format!("{}{}", &word[..i], &word[i + 1..]);
+                if words.contains(removed.as_str()) {
+                    println!("{removed:15}+ {c} = {word}")
+                }
+                one_removed.entry(removed).or_default().push((word, c));
+            }
+            // look up all words that can one letter can be removed from to get this
+            if let Some(removeds) = one_removed.get(word) {
+                for (removed, c) in removeds {
+                    println!("{word:15}+ {c} = {removed}")
+                }
+            }
         }
     }
 }
