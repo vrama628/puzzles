@@ -8,7 +8,10 @@ pub struct Trie {
 }
 
 impl Trie {
-    fn construct_from(prefix: &str, lines: &mut Peekable<Lines>) -> Self {
+    fn construct_from<'a, I: Iterator<Item = &'a str>>(
+        prefix: &str,
+        lines: &mut Peekable<I>,
+    ) -> Self {
         let contains = lines.next_if_eq(&prefix).is_some();
         let mut children = [const { None }; 26];
         while lines.peek().is_some_and(|&word| word.starts_with(prefix)) {
@@ -65,5 +68,11 @@ impl Trie {
             return vec![];
         };
         suffix.take(prefix, n)
+    }
+}
+
+impl<'a> FromIterator<&'a str> for Trie {
+    fn from_iter<I: IntoIterator<Item = &'a str>>(iter: I) -> Self {
+        Self::construct_from("", &mut iter.into_iter().peekable())
     }
 }
