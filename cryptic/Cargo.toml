@@ -7,3 +7,4 @@ edition = "2021"
 clap = { version = "4.5.23", features = ["derive"] }
 indexmap = "2.7.0"
 letter-boxed = { path = "../letter-boxed" }
+rand = "0.8.5"

@@ -2,12 +2,14 @@ use std::collections::HashSet;
 
 use clap::Parser;
 use hide::Hide;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 
 mod hide;
 mod knit;
+mod knot;
 
 use knit::{knit_knot, Knit};
+use knot::Knot;
 use letter_boxed::trie::Trie;
 
 const FREQ_CORPUS: &str = include_str!("../data/unigram_freq.csv");
@@ -52,6 +54,9 @@ enum Args {
         core: String,
     },
     Knit,
+    Knot {
+        minimum_length: Option<usize>,
+    },
     Hide {
         #[arg(short, long)]
         minimum_overlap: Option<usize>,
@@ -71,6 +76,7 @@ impl Args {
             Self::Case { start, end } => Self::case(start, end),
             Self::Core { core } => Self::core(core),
             Self::Knit => Self::knit(),
+            Self::Knot { minimum_length } => Self::knot(minimum_length),
             Self::Hide {
                 target,
                 minimum_overlap,
@@ -118,6 +124,11 @@ impl Args {
     fn knit() {
         let trie = Trie::construct();
         knit_knot(&Knit::knew(&trie), &Knit::knew(&trie), &Knit::knew(&trie));
+    }
+
+    fn knot(minimum_length: Option<usize>) {
+        let knot = Knot::knew(scowl_corpus().collect(), minimum_length);
+        knot.go();
     }
 
     fn hide(target: String, minimum_overlap: Option<usize>) {
